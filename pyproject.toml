@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "structured-request-reliability"
+version = "0.1.0"
+description = "Frozen-adapter regression evaluation and local structured inference"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "torch==2.14.0",
+  "transformers==5.17.0",
+  "peft==0.21.0",
+  "bitsandbytes==0.50.2",
+  "accelerate==1.15.0",
+  "huggingface-hub==1.32.0",
+  "safetensors==0.8.0",
+  "kernels==0.17.1; sys_platform == 'darwin'",
+  "psutil==7.2.2",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "httpx==0.28.1", "ruff==0.16.8"]
+notebook = [
+  "jupyterlab>=4.4,<5",
+  "ipykernel>=6.30,<8",
+  "nbformat>=5.10,<6",
+  "nbclient>=0.10,<1",
+  "pandas>=2.2,<4",
+  "matplotlib>=3.10,<4",
+  "pip>=25,<27",
+  "httpx==0.28.1",
+]
+
+[project.scripts]
+request-reliability = "request_reliability.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/request_reliability"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

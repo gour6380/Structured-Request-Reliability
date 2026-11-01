@@ -1,0 +1,206 @@
+# Frozen adapters on Apple Silicon: regression evidence and serving boundaries
+
+**Evidence reviewed: 30 September 2026.** This report covers frozen-model handoff,
+strict evaluation, a bounded MPS comparison, and local serving. The latest saved
+notebook completed in **replay mode**. It verified files and rescored saved outputs;
+it did not generate a new native-model experiment or latency benchmark.
+
+The strongest result is narrow: an independently copied QLoRA adapter reproduced
+all eight fixed CUDA reference continuations and generated token sequences on
+MPS. Four of those eight answers were correct. LoRA loading stopped twice at the
+memory guard, so there is no native LoRA quality or performance result.
+
+[Machine-readable evidence](public/results.json) contains selected aggregate
+measurements and hashes of the local source artifacts. The raw runs and executed
+working notebook remain local; the [public notebook](../notebooks/public/structured_request_reliability.ipynb)
+is an output-free executable copy.
+
+## 1. Question and fixed protocol
+
+Can the final adapters preserve their recorded request-to-JSON behavior when
+loaded from an independent local bundle, while making failures explicit?
+
+The primary gate permits **zero whole-record regressions and zero schema-validity
+regressions** on the first eight requests in original test-file order. Selection
+is independent of outcomes. Exact continuation text and generated token IDs are
+measured separately; they are stronger observations than the required quality
+gate. Missing requests cannot pass. No prompt tuning, checkpoint substitution,
+retraining or output repair occurs in this project.
+
+| Component | Recorded configuration |
+|---|---|
+| Base model | Qwen2.5-1.5B-Instruct |
+| Model revision | `989aa7980e4cf806f80c7fef2b1adb7bc71aa306` |
+| Data | MASSIVE 1.1, en-US; 2,974 reused test requests |
+| Adapters | Final epoch-five LoRA and QLoRA; rank 16, alpha 32, dropout 0.05 |
+| Target modules | `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj` |
+| Inherited training budget | 3,600 updates and 1,172,405 target tokens per adapted arm; seed 2027 |
+| QLoRA backbone | Saved NF4 weights, double quantization, BF16 compute |
+| Generation | Greedy (`do_sample=False`), one beam, at most 256 new tokens, KV cache enabled |
+| Context | At most 2,048 tokens; fixed prompt, tokenizer and ontology |
+| Source / local batching | CUDA batches of 32 / MPS batch one |
+| Local runtime | Python 3.13.11; torch 2.14.0, transformers 5.17.0, PEFT 0.21.0, bitsandbytes 0.50.2 |
+
+The saved generation configuration also retains inherited settings such as a
+1.1 repetition penalty. Terminal EOS/PAD tokens alone are stripped. The full
+frozen decoding configuration is recorded in the public evidence. This project
+consumes the source training result; it does not re-estimate training memory or
+training speed.
+
+## 2. Artifact and scoring integrity
+
+The independent bundle contains **73 files / 4,451,390,755 bytes (4.15 GiB)**:
+matching dense/NF4 backbones, adapters, tokenizer, prompt, ontology, evaluation
+inputs, source predictions and provenance. SHA-256 verification covers every
+registered file. The original handoff also checked independent file copies and
+inodes. Four source metadata documents lacked inherited self-checksums; their
+hashes attest to the handoff observation, not an earlier independent authority.
+
+The scorer parses the complete response. It rejects duplicate keys, Markdown
+fences, nonstandard JSON constants, extra fields, wrong types and unknown labels.
+Whole-record correctness requires the correct intent and the exact multiset of
+slot type/value pairs, preserving repeated slots and case-sensitive values.
+Schema validity checks structure and ontology membership; it does not establish
+semantic correctness. Invalid outputs stay in the evaluation denominator.
+
+All four saved 2,974-response sets were rescored and matched their recorded
+row-level score fields and aggregate metrics. This establishes consistency with
+the source scoring protocol, not an independent untouched evaluation dataset.
+
+## 3. Recomputed source results
+
+These measurements come from saved **CUDA** responses. They are not full-test MPS
+measurements. Accuracy and validity columns are percentages; F1 columns use 0–1.
+
+| System | Entire response correct | Schema valid | Intent correct | Intent macro F1 | Slot F1 |
+|---|---:|---:|---:|---:|---:|
+| Dense base | 5.68% (169/2,974) | 59.28% | 32.85% | 0.3480 | 0.1465 |
+| NF4 base | 0.27% (8/2,974) | 3.19% | 1.82% | 0.0272 | 0.0154 |
+| LoRA | 72.46% (2,155/2,974) | 99.56% | 89.95% | 0.8714 | 0.8130 |
+| QLoRA | 72.06% (2,143/2,974) | 99.66% | 89.27% | 0.8694 | 0.8131 |
+
+![Whole-record correctness and schema validity in the saved CUDA comparison](public/reference-scores.png)
+
+**Observation:** adaptation is associated with substantially higher correctness
+and schema validity in this fixed source experiment. LoRA has 12 more fully
+correct responses than QLoRA, a difference of about 0.40 percentage points.
+
+**Interpretation:** structured-output learning transferred into the frozen
+artifacts, but near-perfect schema validity still leaves substantial semantic
+errors. The single paired seed and inspected test set do not establish general
+superiority of either adaptation method or statistical equivalence.
+
+The NF4 base result is particularly poor: 2,752 responses are invalid JSON.
+That is an observed property of this exact frozen baseline, prompt and runtime.
+It does not isolate a universal causal effect of four-bit quantization.
+
+| Recorded semantic failure category | LoRA | QLoRA |
+|---|---:|---:|
+| Wrong intent | 298 | 319 |
+| Missing slots | 337 | 334 |
+| Extra slots | 359 | 370 |
+| Wrong slot values | 143 | 145 |
+
+Failure categories can overlap within one response and must not be summed into
+an overall error count. For example, a valid JSON record may contain both a wrong
+intent and missing slots.
+
+## 4. Native regression and memory failures
+
+| Native check | Recorded result | Scope |
+|---|---|---|
+| QLoRA prompt token parity | Passed | Eight fixed requests |
+| QLoRA continuation text | 8/8 identical | CUDA reference versus MPS candidate |
+| QLoRA generated token IDs | 8/8 identical | Same eight continuations |
+| QLoRA whole-record correctness | 4/8 in both reference and candidate | 50% task accuracy on this prefix |
+| QLoRA schema validity | 8/8 in both | No schema regressions |
+| LoRA combined-run attempt | Loading stopped at swap-growth guard | Zero completed requests |
+| LoRA isolated retry | Same guard stopped loading | Zero completed requests |
+
+The combined run remains a failed overall run because its LoRA arm did not
+complete. A passing QLoRA arm does not turn that combined result into a pass.
+The local code reports each arm separately and retains failed attempts.
+
+MPS uses BF16 compute with the preserved FP32 shared parameters and Qwen rotary
+handling. Both hardware and batch size differ from the reference, so agreement
+is a bounded portability observation; disagreement would not isolate device
+from batching effects.
+
+The 128 MiB system-swap-growth guard stopped both LoRA attempts. Swap is
+machine-wide and cannot attribute memory growth solely to the model process.
+After those failures, dense-model admission was strengthened to at least 6 GiB
+available memory; NF4 admission remains 3 GiB. Those bounds are preflight checks,
+not guarantees of fit. No third LoRA attempt or guard bypass is recorded.
+
+## 5. Local API and failure handling
+
+The CLI, notebook and FastAPI boundary share the same frozen inference engine.
+The service admits one inference at a time. Invalid input returns 422, a busy
+model 503, an exceeded request deadline 504, and schema-invalid model output 502.
+Responses expose model/adapter identity and request IDs. Operational logs omit
+request and generated text.
+
+The saved real QLoRA ASGI check returned 200 for two identical reference requests,
+matched the expected parsed response, produced distinct request IDs, returned 422
+for whitespace input, and released the model after shutdown. This was an
+in-process HTTP check, not an external network or concurrent-load experiment.
+Its individual durations are diagnostic observations, not p50/p95 measurements.
+
+Timeout or caller cancellation retains model ownership until native work exits;
+shutdown waits before freeing weights. A native kernel call can overrun the
+cooperative generation deadline. The service is intended for a loopback,
+single-worker research deployment.
+
+## 6. Latest notebook execution and software evidence
+
+The saved notebook has 40 cells, including 19 executed code cells, and no recorded
+error output. It selects `MODE="replay"`, `PRESET="smoke8"`, `DEVICE="auto"`, with
+all optional live actions disabled. Its visible results are:
+
+- Complete hash verification of the frozen bundle and rescoring of saved answers.
+- Cached QLoRA pass, cached LoRA failure and cached API pass.
+- Missing local baseline comparisons, standalone prediction and timing benchmark.
+- No new inference; no `reports/notebook-*` run directory is present.
+
+**Environment limitation:** the latest saved kernel path identifies the adaptation
+project's Python environment, while source discovery selects this reliability
+project. That supports the observed replay but does not verify execution in the
+reliability project's locked environment. An earlier automated fresh-kernel replay
+used this project's own environment and completed all 19 code cells. Its execution
+receipt refers to that earlier notebook snapshot; the two executions are kept
+separate in the public evidence.
+
+The current software gate passes **127 tests and 38 subtests**, plus Ruff lint,
+format checks and dependency consistency. The earlier notebook-refactor gate
+contained 126 tests; the added test checks provenance for the nested public
+notebook while excluding checkpoint copies. Tests cover integrity, scoring,
+regression gates, malformed output, deadline/cancellation behavior, model release,
+replay scope/device matching and notebook API checks. Most failure paths use
+synthetic data and fake engines; they do not imply additional model evaluations.
+
+Use the named project kernel described in the [README](../README.md) for the next
+run. The executed working notebook is preserved locally; the public copy clears
+outputs and execution metadata and names the intended project kernel.
+
+## 7. Limitations and next experiment
+
+The test requests were already inspected in the source experiment. Reuse here is
+regression detection, not new generalization evidence. Eight cases do not establish
+full-test parity or reliability on new requests. No fresh local baseline matrix,
+full 2,974-request MPS comparison, validation latency benchmark or peak-memory
+measurement is recorded. The current memory counters are overlapping point
+samples and must not be summed or relabeled as peaks.
+
+The next measured step is a fresh **QLoRA smoke run using the project kernel**,
+followed by the fixed validation-only benchmark if memory conditions permit.
+Benchmarking separates loading, the first request, two excluded warmups and
+measured requests, with synchronized p50/p95 and throughput. Those values remain
+unreported until the benchmark runs. Revisit LoRA only after memory availability
+improves, retaining the frozen cases and guards.
+
+The practical result is a local system that can verify artifacts, reproduce a
+small set of adapted-model outputs and expose stopped runs clearly. Its strongest
+limitation is the small native comparison and incomplete LoRA/runtime matrix.
+A public source checkout includes code, locked dependencies, an output-free
+notebook and aggregate evidence; exact reruns additionally require the separately
+retained private frozen bundle.

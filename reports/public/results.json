@@ -1,0 +1,387 @@
+{
+  "api": {
+    "closed_after_shutdown": true,
+    "counters": {
+      "accepted": 2,
+      "busy_rejected": 0,
+      "cancelled": 0,
+      "failed": 0,
+      "succeeded": 2,
+      "timed_out": 0
+    },
+    "device": "mps",
+    "health_status": "ready",
+    "invalid_input_status": 422,
+    "passed": true,
+    "prediction_statuses": [
+      200,
+      200
+    ],
+    "repeat_parsed_output_equal": true,
+    "request_ids_distinct": true,
+    "response_matches_reference": true,
+    "scope": "Previously recorded in-process ASGI check; not a TCP or load test",
+    "system": "qlora"
+  },
+  "native_lora_attempts": [
+    {
+      "completed_requests": 0,
+      "error_type": "RuntimeError",
+      "passed": false,
+      "reason_code": "swap_growth_guard",
+      "requested_requests": 8,
+      "source": "reports/mps-reference-smoke/summary.json",
+      "status": "failed",
+      "swap_growth_limit_mib": 128
+    },
+    {
+      "completed_requests": 0,
+      "error_type": "RuntimeError",
+      "passed": false,
+      "reason_code": "swap_growth_guard",
+      "requested_requests": 8,
+      "source": "reports/mps-lora-isolated/summary.json",
+      "status": "failed",
+      "swap_growth_limit_mib": 128
+    }
+  ],
+  "native_qlora": {
+    "acceptance": {
+      "full_equivalence_demonstrated": false,
+      "full_reference_evaluated": false,
+      "passed": true
+    },
+    "example_count": 8,
+    "limitation": "Eight matching outputs include four correct responses; full-test equivalence is untested.",
+    "metrics": {
+      "example_count": 8,
+      "intent_accuracy": 0.5,
+      "intent_macro_f1": 0.05555555555555555,
+      "joint_exact_match": 0.5,
+      "schema_valid_rate": 1.0,
+      "slot_f1": 0.8
+    },
+    "prompt_token_parity": true,
+    "scope": "First eight requests in frozen test-file order; MPS regression smoke check",
+    "text_agreement": {
+      "compared": 8,
+      "equal": 8,
+      "rate": 1.0
+    },
+    "token_agreement": {
+      "compared": 8,
+      "equal": 8,
+      "rate": 1.0
+    },
+    "whole_record_correct_count": 4
+  },
+  "notebook_audit": {
+    "earlier_project_environment_verification": {
+      "cell_count": 40,
+      "error_count": 0,
+      "executed_code_cells": 19,
+      "inference_performed": false,
+      "mode": "replay",
+      "notebook_hash_matches_latest_saved_copy": false,
+      "notebook_sha256": "38a4c91eda00aa8bd6accd295e5ba39f5b3bc971f5a53e8215eeec4d254e89b0",
+      "qualification": "Earlier project-environment replay audit; a separate execution from the latest saved adaptation-project-kernel replay.",
+      "seconds": 32.28794454099989,
+      "status": "passed"
+    },
+    "latest_saved_execution": {
+      "code_cells": 19,
+      "completed_code_cells": 19,
+      "inference_performed": false,
+      "kernel_role": "adaptation_project_python",
+      "mode": "replay",
+      "notebook_session_report_directories": 0,
+      "preset": "smoke8",
+      "python_version": "3.13.11",
+      "qualification": "The latest saved notebook is a completed replay using the adaptation project Python kernel. It is not an isolated reliability environment check or native run.",
+      "reliability_environment_verified_by_this_execution": false,
+      "saved_error_outputs": 0,
+      "saved_outcomes": {
+        "api": {
+          "inference_performed": false,
+          "passed": true,
+          "recorded_status": null,
+          "status": "cached"
+        },
+        "base": {
+          "inference_performed": false,
+          "status": "missing"
+        },
+        "benchmark": {
+          "inference_performed": false,
+          "status": "missing"
+        },
+        "lora": {
+          "inference_performed": false,
+          "passed": false,
+          "status": "cached"
+        },
+        "prediction": {
+          "inference_performed": false,
+          "status": "missing"
+        },
+        "qlora": {
+          "inference_performed": false,
+          "passed": true,
+          "status": "cached"
+        },
+        "quantized_base": {
+          "inference_performed": false,
+          "status": "missing"
+        }
+      },
+      "sequential_execution_counts": true
+    }
+  },
+  "protocol": {
+    "checkpoint": "final",
+    "epochs_completed": 5,
+    "evaluation_batch_note": "Source CUDA evaluation uses batch size 32; native smoke and API use one request at a time.",
+    "evaluation_batch_size": 32,
+    "generation": {
+      "decoding": "Strip terminal EOS/PAD only; retain other special tokens; no text repair",
+      "do_sample": false,
+      "inherited_configuration": {
+        "bos_token_id": 151643,
+        "do_sample": true,
+        "eos_token_id": [
+          151645,
+          151643
+        ],
+        "pad_token_id": 151643,
+        "repetition_penalty": 1.1,
+        "temperature": 0.7,
+        "top_k": 20,
+        "top_p": 0.8,
+        "transformers_version": "4.37.0"
+      },
+      "num_beams": 1,
+      "padding": "Left-padded prompts with explicit attention masks",
+      "qualification": "Explicit generation fields override inherited values. Sampling controls are inactive with do_sample=false; EOS/PAD use the saved tokenizer.",
+      "terminal_token_policy": "Saved tokenizer eos_token_id and pad_token_id",
+      "use_cache": true
+    },
+    "locale": "en-US",
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_rank": 16,
+    "max_new_tokens": 256,
+    "max_sequence_length": 2048,
+    "model_identity": {
+      "compute_dtype": "torch.bfloat16",
+      "device": "mps",
+      "manifest_sha256": "2ad5834f5e99f3ab2f254737017a3a41cab4a47b6ffcd51d6e2add19a91ff7f4",
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "model_revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "source_device": "cuda"
+    },
+    "seed": 2027,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "training": {
+      "epochs": 5,
+      "expected_split_counts": [
+        11514,
+        2033,
+        2974
+      ],
+      "gradient_accumulation": 1,
+      "learning_rate": 0.0002,
+      "microbatch_size": 16,
+      "warmup_ratio": 0.03,
+      "weight_decay": 0.0
+    }
+  },
+  "provenance": {
+    "exporter": {
+      "path": "scripts/export_public_artifacts.py",
+      "sha256": "1b7aa0c3d6fc170afb1bc8e9c679a257338090f6e26070952e00e467344d2072"
+    },
+    "qualification": "Relative source paths and SHA-256 only. Raw private source artifacts are not included in the public export.",
+    "sources": {
+      "data/frozen/manifest.json": "2ad5834f5e99f3ab2f254737017a3a41cab4a47b6ffcd51d6e2add19a91ff7f4",
+      "notebooks/structured_request_reliability.ipynb": "ea6dd21266436b6215827848bdcdad02e2ffb1c3f28b6919715557e855663bae",
+      "reports/local-api-check.json": "43da03840dbc0fe1d11436a4682a49464dc4dae9a27e1857ded1d534c72688ef",
+      "reports/mps-lora-isolated/summary.json": "b30ae76df54d8fbef4add6d46ddcc9c26a76ae00fd8b2e0cf3665f6e64368bec",
+      "reports/mps-reference-smoke/qlora/report.json": "175fb12d90bf99ad37670fcecddb339171832f1a24ddb2932cf4e9971144049b",
+      "reports/mps-reference-smoke/summary.json": "5529f492a14d0c7ae8dcb161f94004462d3924297f26286d417a00623e370cf5",
+      "reports/reference-audit.json": "69cd0d5a7f650a03dd7e34a77cf0a2c07ffbb9645c0fe72b3daf2a1a2a3d37cc",
+      "verification/github-tests.xml": "5e18e90db334a726b25160ddf10c3e287a7879ebdefc76ddd8afe78a34614d3a",
+      "verification/notebook-execution.json": "88565f884e14b868203ad6aa986a7751a752cc4e6b37223fe1cf34fecce3968d",
+      "verification/notebook-tests.xml": "ea320703e40eca8c341c6d0dc2a94664b3edf6bb08eb11c64a02980f757a377b"
+    }
+  },
+  "schema_version": 1,
+  "software_validation": {
+    "dependency_check": "passed",
+    "junit": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 164
+    },
+    "latest_github_preparation_gate": {
+      "junit": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 165
+      },
+      "scope": "Latest saved GitHub-preparation JUnit receipt; not rerun by this exporter",
+      "status": "passed",
+      "subtests_passed": 38,
+      "test_cases_passed": 127
+    },
+    "ruff": "passed",
+    "scope": "Recorded notebook-refactor test run; not a new test run by this exporter",
+    "subtests_passed": 38,
+    "test_cases_passed": 126
+  },
+  "source_reference": {
+    "examples_per_system": 2974,
+    "scope": "Recomputed saved CUDA predictions; reused test data; no new inference",
+    "status": "passed",
+    "systems": {
+      "base": {
+        "counts": {
+          "extra_slots": 2131,
+          "intent_correct": 977,
+          "joint_exact_match": 169,
+          "json_valid": 2445,
+          "missing_slots": 1930,
+          "schema_valid": 1763,
+          "slot_fn": 2388,
+          "slot_fp": 2589,
+          "slot_tp": 427,
+          "structure_valid": 2253,
+          "wrong_values": 458
+        },
+        "example_count": 2974,
+        "failure_counts": {
+          "extra_slots": 1611,
+          "invalid_json": 529,
+          "invalid_structure": 192,
+          "missing_slots": 1511,
+          "unknown_intent": 131,
+          "unknown_slot_type": 413,
+          "wrong_intent": 1276,
+          "wrong_values": 422
+        },
+        "intent_accuracy": 0.3285137861466039,
+        "intent_macro_f1": 0.34803803351791274,
+        "joint_exact_match": 0.05682582380632145,
+        "schema_valid_count": 1763,
+        "schema_valid_rate": 0.5928043039677202,
+        "slot_f1": 0.14645858343337334,
+        "whole_record_correct_count": 169
+      },
+      "lora": {
+        "counts": {
+          "extra_slots": 397,
+          "intent_correct": 2675,
+          "joint_exact_match": 2155,
+          "json_valid": 2973,
+          "missing_slots": 369,
+          "schema_valid": 2961,
+          "slot_fn": 515,
+          "slot_fp": 543,
+          "slot_tp": 2300,
+          "structure_valid": 2973,
+          "wrong_values": 146
+        },
+        "example_count": 2974,
+        "failure_counts": {
+          "extra_slots": 359,
+          "invalid_json": 1,
+          "missing_slots": 337,
+          "unknown_intent": 4,
+          "unknown_slot_type": 8,
+          "wrong_intent": 298,
+          "wrong_values": 143
+        },
+        "intent_accuracy": 0.8994620040349698,
+        "intent_macro_f1": 0.8714261764373517,
+        "joint_exact_match": 0.7246133154001345,
+        "schema_valid_count": 2961,
+        "schema_valid_rate": 0.9956287827841291,
+        "slot_f1": 0.8130081300813008,
+        "whole_record_correct_count": 2155
+      },
+      "qlora": {
+        "counts": {
+          "extra_slots": 402,
+          "intent_correct": 2655,
+          "joint_exact_match": 2143,
+          "json_valid": 2974,
+          "missing_slots": 362,
+          "schema_valid": 2964,
+          "slot_fn": 510,
+          "slot_fp": 550,
+          "slot_tp": 2305,
+          "structure_valid": 2974,
+          "wrong_values": 148
+        },
+        "example_count": 2974,
+        "failure_counts": {
+          "extra_slots": 370,
+          "missing_slots": 334,
+          "unknown_intent": 7,
+          "unknown_slot_type": 4,
+          "wrong_intent": 319,
+          "wrong_values": 145
+        },
+        "intent_accuracy": 0.8927370544720915,
+        "intent_macro_f1": 0.8693989473937744,
+        "joint_exact_match": 0.7205783456624075,
+        "schema_valid_count": 2964,
+        "schema_valid_rate": 0.9966375252185609,
+        "slot_f1": 0.8130511463844797,
+        "whole_record_correct_count": 2143
+      },
+      "quantized_base": {
+        "counts": {
+          "extra_slots": 127,
+          "intent_correct": 54,
+          "joint_exact_match": 8,
+          "json_valid": 222,
+          "missing_slots": 2776,
+          "schema_valid": 95,
+          "slot_fn": 2792,
+          "slot_fp": 143,
+          "slot_tp": 23,
+          "structure_valid": 126,
+          "wrong_values": 16
+        },
+        "example_count": 2974,
+        "failure_counts": {
+          "extra_slots": 100,
+          "invalid_json": 2752,
+          "invalid_structure": 96,
+          "missing_slots": 1960,
+          "unknown_intent": 5,
+          "unknown_slot_type": 27,
+          "wrong_intent": 72,
+          "wrong_values": 16
+        },
+        "intent_accuracy": 0.01815736381977135,
+        "intent_macro_f1": 0.0271597350159962,
+        "joint_exact_match": 0.0026899798251513113,
+        "schema_valid_count": 95,
+        "schema_valid_rate": 0.03194351042367182,
+        "slot_f1": 0.015431063401543106,
+        "whole_record_correct_count": 8
+      }
+    }
+  }
+}
