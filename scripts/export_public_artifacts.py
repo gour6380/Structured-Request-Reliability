@@ -7,12 +7,15 @@ are never copied wholesale into the public results.
 
 from __future__ import annotations
 
+import argparse
 import ast
 import copy
 import hashlib
 import json
+import math
 import os
 import shutil
+import statistics
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -20,6 +23,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SYSTEMS = ("base", "quantized_base", "lora", "qlora")
 WORKING_NOTEBOOK = "notebooks/structured_request_reliability.ipynb"
+BENCHMARK_SOURCE = "reports/benchmark-qlora-validation-20261101T084410Z/summary.json"
+BENCHMARK_PREFLIGHT = "verification/bounded-benchmark-2026-11-01-preflight.json"
+BENCHMARK_TESTS = "verification/bounded-benchmark-2026-11-01-tests.xml"
+VALIDATION_SOURCE = "data/frozen/examples/validation.jsonl"
+DATA_AUDIT_SOURCE = "data/frozen/provenance/data.json"
 SOURCES = (
     "reports/reference-audit.json",
     "reports/mps-reference-smoke/qlora/report.json",
@@ -30,6 +38,10 @@ SOURCES = (
     "verification/notebook-tests.xml",
     "data/frozen/manifest.json",
     WORKING_NOTEBOOK,
+    BENCHMARK_SOURCE,
+    BENCHMARK_PREFLIGHT,
+    VALIDATION_SOURCE,
+    DATA_AUDIT_SOURCE,
 )
 METRICS = (
     "example_count",
@@ -74,6 +86,125 @@ def digest(relative: str) -> str:
 
 def selected(value: dict, names: tuple[str, ...]) -> dict:
     return {name: value[name] for name in names}
+
+
+def benchmark_results(
+    benchmark: dict,
+    preflight: dict,
+    validation_ids: list[str],
+    manifest: dict,
+    manifest_sha256: str,
+) -> dict:
+    """Validate the reviewed run, then expose aggregates without raw requests or paths."""
+    identity = benchmark["identity"]
+    if (
+        identity["system"] != "qlora"
+        or identity["device"] != "mps"
+        or identity["compute_dtype"] != "torch.bfloat16"
+        or identity["manifest_sha256"] != manifest_sha256
+        or preflight["bundle"]["manifest_sha256"] != manifest_sha256
+        or any(identity[key] != manifest["config"][key] for key in ("model_id", "model_revision"))
+    ):
+        raise ValueError("Benchmark identity differs from the reviewed QLoRA/MPS frozen protocol")
+    measurements = benchmark["measurements"]
+    expected = [(value, repetition) for repetition in range(3) for value in validation_ids]
+    if (
+        len(validation_ids) != 8
+        or len(set(validation_ids)) != 8
+        or benchmark["measured_requests"] != 24
+        or benchmark["warmup_requests"] != 2
+        or len(measurements) != 24
+        or [(str(row["id"]), row["repetition"]) for row in measurements] != expected
+        or any(type(row["repetition"]) is not int for row in measurements)
+    ):
+        raise ValueError("Benchmark scope differs from the first eight validation inputs ×3")
+    times = []
+    for row in measurements:
+        duration = row["seconds"]
+        if (
+            type(duration) not in (int, float)
+            or not math.isfinite(duration)
+            or duration <= 0
+            or type(row["generated_tokens"]) is not int
+            or row["generated_tokens"] <= 0
+            or type(row["schema_valid"]) is not bool
+        ):
+            raise ValueError("Benchmark contains invalid measurement values")
+        times.append(duration)
+    total_seconds = sum(times)
+    total_tokens = sum(row["generated_tokens"] for row in measurements)
+    computed = {
+        "p50_seconds": statistics.median(times),
+        "p95_seconds": sorted(times)[math.ceil(len(times) * 0.95) - 1],
+        "requests_per_second": len(times) / total_seconds,
+        "generated_tokens_per_second": total_tokens / total_seconds,
+    }
+    for name, value in computed.items():
+        if not math.isclose(benchmark[name], value, rel_tol=1e-12, abs_tol=1e-12):
+            raise ValueError(f"Benchmark aggregate disagrees with measurements: {name}")
+    for name in ("model_load_seconds", "first_request_seconds"):
+        if not math.isfinite(benchmark[name]) or benchmark[name] <= 0:
+            raise ValueError(f"Invalid benchmark duration: {name}")
+    memory = {}
+    for name in (
+        "rss_bytes",
+        "mps_allocated_bytes",
+        "mps_driver_bytes",
+        "system_swap_used_bytes",
+    ):
+        values = [row["memory"][name] for row in measurements]
+        if any(type(value) is not int or value < 0 for value in values):
+            raise ValueError(f"Invalid benchmark memory counter: {name}")
+        memory[name] = {"minimum_bytes": min(values), "maximum_bytes": max(values)}
+    return {
+        "scope": (
+            "First eight frozen validation inputs, sequential MPS inference, three repetitions"
+        ),
+        "distinct_validation_inputs": 8,
+        "repetitions": 3,
+        "measured_requests": len(measurements),
+        "separate_first_requests": 1,
+        "excluded_warmup_requests": 2,
+        "model_load_seconds": benchmark["model_load_seconds"],
+        "first_request_seconds": benchmark["first_request_seconds"],
+        **computed,
+        "total_timed_seconds": total_seconds,
+        "total_generated_tokens": total_tokens,
+        "schema_valid_count": sum(row["schema_valid"] for row in measurements),
+        "schema_invalid_count": sum(not row["schema_valid"] for row in measurements),
+        "memory_point_sample_ranges": memory,
+        "preflight_system_swap_used_bytes": preflight["system_swap_used_bytes"],
+        "identity": selected(
+            identity,
+            (
+                "system",
+                "model_id",
+                "model_revision",
+                "manifest_sha256",
+                "device",
+                "compute_dtype",
+                "python",
+            ),
+        ),
+        "packages": selected(
+            identity["packages"],
+            ("torch", "transformers", "peft", "bitsandbytes", "safetensors"),
+        ),
+        "hardware": selected(preflight, ("platform", "machine", "memory_total_bytes")),
+        "timing_boundary": (
+            "Tokenization, transfer, generation, synchronization, decoding and schema validation; "
+            "model loading and subsequent memory snapshots excluded."
+        ),
+        "qualifications": [
+            "Eight repeated inputs are not 24 independent examples or a population-tail estimate.",
+            "Schema validity is not task correctness; this run computes no accuracy score.",
+            "Memory counters overlap; point samples are not peaks or a continuous paging trace.",
+            "OS disk caches were not flushed; load and first request are not storage-cold results.",
+            "Throughput excludes load, warmups and orchestration; not concurrent serving capacity.",
+            "Generated-token counts include terminal tokens.",
+            "No native baseline, LoRA or CUDA performance comparison was measured.",
+        ],
+    }
 
 
 def output_for(notebook: dict, source_fragment: str) -> dict:
@@ -154,6 +285,7 @@ def build_results(notebook: dict) -> dict:
     api = read("reports/local-api-check.json")
     execution = read("verification/notebook-execution.json")
     manifest = read("data/frozen/manifest.json")
+    data_audit = read(DATA_AUDIT_SOURCE)
     comparisons = native["comparison"]
     lora_attempts = []
     for source in (SOURCES[2], SOURCES[3]):
@@ -194,6 +326,11 @@ def build_results(notebook: dict) -> dict:
     )
     if identity["manifest_sha256"] != digest("data/frozen/manifest.json"):
         raise ValueError("Native result does not identify the supplied frozen manifest")
+    validation_ids = [
+        str(json.loads(line)["id"])
+        for line in (ROOT / VALIDATION_SOURCE).read_text().splitlines()
+        if line.strip()
+    ][:8]
     return {
         "schema_version": 1,
         "source_reference": {
@@ -217,6 +354,50 @@ def build_results(notebook: dict) -> dict:
                     ],
                 }
                 for system in SYSTEMS
+            },
+            "novel_input_subset": {
+                "scope": (
+                    "Saved CUDA test responses whose normalized input is absent from both "
+                    "train and validation; still inspected source-experiment data"
+                ),
+                "examples_per_system": data_audit["novel_input_counts"]["test"],
+                "systems": {
+                    system: {
+                        **selected(
+                            reference["systems"][system]["metrics"]["novel_input_subset"],
+                            METRICS,
+                        ),
+                        "whole_record_correct_count": reference["systems"][system]["metrics"][
+                            "novel_input_subset"
+                        ]["counts"]["joint_exact_match"],
+                        "schema_valid_count": reference["systems"][system]["metrics"][
+                            "novel_input_subset"
+                        ]["counts"]["schema_valid"],
+                    }
+                    for system in SYSTEMS
+                },
+            },
+            "data_overlap_audit": {
+                "normalization": "NFKC, casefold, collapse whitespace; audit only",
+                "all_official_rows_retained": True,
+                "duplicate_group_counts": {
+                    kind: selected(
+                        data_audit["duplicate_audit_counts"][kind],
+                        (
+                            "duplicate_group_count",
+                            "cross_split_group_count",
+                            "conflicting_group_count",
+                        ),
+                    )
+                    for kind in ("exact", "normalized")
+                },
+                "test_input_overlap_count": data_audit["split_counts"]["test"]
+                - data_audit["novel_input_counts"]["test"],
+                "novel_test_input_count": data_audit["novel_input_counts"]["test"],
+                "qualification": (
+                    "Observed cross-split overlap; novel-input filtering does not make the "
+                    "inspected test set a new untouched evaluation."
+                ),
             },
         },
         "native_qlora": {
@@ -247,6 +428,13 @@ def build_results(notebook: dict) -> dict:
             ),
         },
         "native_lora_attempts": lora_attempts,
+        "native_qlora_benchmark": benchmark_results(
+            read(BENCHMARK_SOURCE),
+            read(BENCHMARK_PREFLIGHT),
+            validation_ids,
+            manifest,
+            digest("data/frozen/manifest.json"),
+        ),
         "api": {
             "scope": "Previously recorded in-process ASGI check; not a TCP or load test",
             **selected(
@@ -475,6 +663,11 @@ def render_chart(results: dict, destination: Path) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--results-only", action="store_true", help="Preserve the public notebook and chart"
+    )
+    args = parser.parse_args()
     notebook = read(WORKING_NOTEBOOK)
     results = build_results(notebook)
     latest_junit = "verification/github-tests.xml"
@@ -495,6 +688,23 @@ def main() -> None:
             "junit": totals,
         }
         results["provenance"]["sources"][latest_junit] = digest(latest_junit)
+    if (ROOT / BENCHMARK_TESTS).is_file():
+        root = ET.parse(ROOT / BENCHMARK_TESTS).getroot()
+        suites = list(root.iter("testsuite"))
+        totals = {
+            key: sum(int(suite.attrib.get(key, "0")) for suite in suites)
+            for key in ("tests", "errors", "failures", "skipped")
+        }
+        tests = len(list(root.iter("testcase")))
+        clean_pass = not any(totals[key] for key in ("errors", "failures", "skipped"))
+        results["software_validation"]["pre_benchmark_gate"] = {
+            "scope": "Saved pre-benchmark JUnit receipt; not rerun by this exporter",
+            "status": "passed" if clean_pass else "not_all_passed",
+            "test_cases_passed": tests if clean_pass else None,
+            "subtests_passed": totals["tests"] - tests if clean_pass else None,
+            "junit": totals,
+        }
+        results["provenance"]["sources"][BENCHMARK_TESTS] = digest(BENCHMARK_TESTS)
     clean = public_notebook(notebook)
     encoded = (
         json.dumps(results, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n"
@@ -517,6 +727,9 @@ def main() -> None:
     public.mkdir(parents=True, exist_ok=True)
     notebooks.mkdir(parents=True, exist_ok=True)
     (public / "results.json").write_text(encoded, encoding="utf-8")
+    if args.results_only:
+        print("Exported public aggregate results; preserved the public notebook and chart.")
+        return
     (notebooks / "structured_request_reliability.ipynb").write_text(clean_encoded, encoding="utf-8")
     with tempfile.TemporaryDirectory(prefix="request-reliability-chart-") as temporary:
         os.environ["MPLCONFIGDIR"] = temporary

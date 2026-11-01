@@ -2,6 +2,10 @@
 
 [GitHub repository](https://github.com/gour6380/Structured-Request-Reliability)
 
+[Efficient Transformers lab index](docs/efficient-transformers.md) ·
+[Release wrap-up](docs/release-wrap-up.md) ·
+[Long-form article draft](docs/efficient-transformers-article.md)
+
 Evaluate and serve frozen Qwen2.5-1.5B-Instruct LoRA/QLoRA adapters on Apple
 Silicon. This standalone, inference-only project provides strict request-to-JSON
 scoring, artifact checks, regression gates, an executable notebook and a bounded
@@ -10,7 +14,9 @@ local API.
 **Recorded result:** QLoRA reproduces all eight fixed reference continuations and
 generated token sequences on MPS, with zero quality regressions. Four of those
 eight answers are correct. LoRA stopped during loading in two attempts at the
-memory guard. Full-test MPS parity and latency benchmarking remain pending.
+memory guard. A separate QLoRA/MPS validation benchmark measured **3.27 s median,
+5.44 s p95 and 6.71 generated tokens/s** over eight inputs repeated three times.
+All 24 measured responses were schema-valid. Full-test MPS parity is untested.
 
 The latest saved notebook ran in **replay mode**: it verified files and rescored
 saved responses, then displayed those existing results. It produced no new model
@@ -20,17 +26,20 @@ predictions. See the [technical report](reports/technical-report.md),
 
 ## Results at a glance
 
-The measurements and test results below are the recorded **30 September 2026**
-evidence. Repository preparation does not constitute a new model run.
+Quality/regression evidence was recorded on **30 September 2026**. The bounded
+validation benchmark ran on **1 November 2026**, in this project's restored
+Python 3.13.11 environment; it is separate from the saved replay notebook.
 
 | Evidence | Result |
 |---|---|
 | Frozen bundle | 73 files, 4.15 GiB; SHA-256 verification passed |
 | Saved CUDA comparison, 2,974 requests/system | LoRA 72.46%, QLoRA 72.06% entire-response accuracy |
 | QLoRA on MPS, eight fixed requests | 8/8 text/token matches; 4/8 correct; 8/8 schema-valid |
+| QLoRA/MPS timing, eight validation inputs ×3 | p50 3.27 s; p95 5.44 s; 6.71 generated tokens/s; 24/24 schema-valid |
 | LoRA on MPS | Two loading stops; no completed predictions |
 | Real-model API check | Repeated response, invalid input and shutdown passed in process |
-| Recorded software verification | 127 tests and 38 subtests passed |
+| Pre-benchmark software verification | 127 tests and 38 subtests passed |
+| Comparison/export software verification | 133 tests and 38 subtests passed |
 | Latest saved notebook | 19 code cells executed; replay only, no recorded errors |
 
 ![Original CUDA accuracy and schema validity](reports/public/reference-scores.png)
@@ -39,6 +48,15 @@ The chart shows rescored **source CUDA** outputs, not a full MPS evaluation. A
 schema-valid answer can still have the wrong intent or slots. The test set is
 reused regression evidence, and an eight-case pass does not establish general
 hardware equivalence or performance on new requests.
+
+Under the fixed source prompt and decoder, LoRA improves whole-record accuracy
+by **66.78 percentage points** over the dense base; QLoRA improves it by **71.79
+points** over the NF4 base. LoRA's 12-answer advantage over QLoRA is a descriptive
+single-seed result. Prompt-only tuning and alternate decoders were not compared.
+The source retains official splits with overlap: 26 test utterances also occur
+in training or validation after normalization. Excluding them gives **72.39%
+LoRA /72.01% QLoRA** on 2,948 requests. See the report for controls, paired outcomes
+and the explicit scope decision for deferred comparisons.
 
 ## Set up the project
 
@@ -152,16 +170,25 @@ requires 3 GiB. A 128 MiB increase in machine-wide swap stops the run. These
 admission bounds do not guarantee fit. Keep LoRA disabled until memory conditions
 improve; the two recorded loading stops remain part of the result.
 
-The implemented validation-only timing command is:
+The measured validation-only timing command is:
 
 ```sh
 .venv/bin/request-reliability benchmark --system qlora --device mps \
   --requests 8 --repetitions 3
 ```
 
-It separates loading, first request, two excluded warmups and synchronized measured
-requests. No p50/p95, throughput or peak-memory result is claimed yet. Retained
-memory observations are point samples, not peaks.
+It separates loading (**4.51 s**), first request (**7.24 s**), two excluded warmups
+and 24 synchronized measured requests. Warm p50/p95 are **3.27/5.44 s**; throughput
+is **0.297 requests/s** or **6.71 generated tokens/s**, excluding loading, warmups
+and orchestration. This is sequential CLI timing, not HTTP capacity or a CUDA
+speed comparison. Disk caches were not flushed. Eight repeated inputs provide a
+bounded latency observation, and schema validity does not measure answer accuracy.
+
+Request-point samples show **0.668–0.746 GiB RSS**, **0.944 GiB MPS allocated** and
+**2.695 GiB MPS driver memory**. These counters overlap and are not peaks. Recorded
+system swap stayed at 10.4375 MiB across measured points, with all original guards
+enabled. Full native replay, baseline performance comparisons and peak-memory
+instrumentation are explicitly deferred in the [scope decision](reports/technical-report.md#8-scope-decision-and-remaining-limits).
 
 ## Repository contents and GitHub preparation
 
@@ -169,6 +196,7 @@ memory observations are point samples, not peaks.
 src/request_reliability/  Shared integrity, scoring, inference, regression, API and workflow
 notebooks/public/        Output-free executable notebook
 configs/                 Fixed regression acceptance rules
+docs/                    Lab evidence index, release wrap-up and long-form article draft
 tests/                   Synthetic correctness and lifecycle checks
 scripts/                 Verified handoff, local checks and public-artifact export
 reports/technical-report.md
@@ -198,6 +226,12 @@ environment, then review the changes:
 ```sh
 .venv/bin/python scripts/export_public_artifacts.py
 ```
+
+Use `--results-only` to refresh selected evidence while preserving the public
+notebook and chart. The benchmark export selects the explicitly reviewed run;
+it validates identity, request order, counts and timing aggregates before
+publishing numeric summaries. Raw inputs, generated text and absolute paths
+remain excluded.
 
 The exporter preserves the working notebook and raw reports, clears outputs from
 the public copy, and writes selected aggregates with source-file hashes. It needs

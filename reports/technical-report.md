@@ -1,14 +1,18 @@
 # Frozen adapters on Apple Silicon: regression evidence and serving boundaries
 
-**Evidence reviewed: 30 September 2026.** This report covers frozen-model handoff,
-strict evaluation, a bounded MPS comparison, and local serving. The latest saved
-notebook completed in **replay mode**. It verified files and rescored saved outputs;
-it did not generate a new native-model experiment or latency benchmark.
+**Evidence reviewed: 1 November 2026.** This report combines the saved CUDA
+quality comparison, an eight-request MPS regression check, local serving checks,
+and a new bounded QLoRA validation benchmark. The latest saved notebook remains a
+historical **replay-mode** execution. The new benchmark ran separately through the
+CLI in this project's restored Python 3.13.11 environment.
 
 The strongest result is narrow: an independently copied QLoRA adapter reproduced
 all eight fixed CUDA reference continuations and generated token sequences on
-MPS. Four of those eight answers were correct. LoRA loading stopped twice at the
-memory guard, so there is no native LoRA quality or performance result.
+MPS. Four of those eight answers were correct. In the new timing run, eight
+validation inputs repeated three times produced 24/24 schema-valid responses,
+with warm median latency **3.2676 seconds** and p95 **5.4403 seconds**. The timing
+run did not score semantic accuracy. LoRA loading stopped twice at the memory
+guard, so there is no native LoRA quality or performance result.
 
 [Machine-readable evidence](public/results.json) contains selected aggregate
 measurements and hashes of the local source artifacts. The raw runs and executed
@@ -67,6 +71,13 @@ All four saved 2,974-response sets were rescored and matched their recorded
 row-level score fields and aggregate metrics. This establishes consistency with
 the source scoring protocol, not an independent untouched evaluation dataset.
 
+The source retained the official splits without removing duplicate utterances.
+Both its exact and normalized audits record **88 duplicate groups, 37 cross-split
+groups and nine groups with conflicting annotations**. There are **26 test
+utterances** whose normalized form also occurs in training or validation. The
+2,948-request novel-input subset below excludes those test rows; this does not
+remove semantic near-duplicates or establish absence of pretraining contamination.
+
 ## 3. Recomputed source results
 
 These measurements come from saved **CUDA** responses. They are not full-test MPS
@@ -104,6 +115,50 @@ It does not isolate a universal causal effect of four-bit quantization.
 Failure categories can overlap within one response and must not be summed into
 an overall error count. For example, a valid JSON record may contain both a wrong
 intent and missing slots.
+
+### What the comparisons isolate
+
+All four saved prediction files align on IDs, utterances, targets and prompt-token
+counts for every one of the 2,974 requests. They use the same base revision,
+tokenizer, system prompt, ontology, scorer, CUDA batch size 32 and generation
+implementation. The two training arms share seed 2027, training-ID hash, initial
+adapter hash, adapter targets/rank, optimizer settings, 57,570 example exposures,
+3,600 updates and 1,172,405 target tokens. Both use the final checkpoint after
+five epochs. Shared non-projection parameters retain the same FP32 policy.
+
+| Contrast | Entire-response accuracy change | Supported interpretation |
+|---|---:|---|
+| Dense base → LoRA | +66.78 percentage points | Adaptation improves this fixed prompt/decoder baseline. |
+| NF4 base → QLoRA | +71.79 percentage points | Adaptation improves this saved NF4 baseline under the fixed protocol. |
+| LoRA → QLoRA | −0.40 percentage points | A small descriptive difference from one paired training seed. |
+| Dense base → NF4 base | −5.41 percentage points | This particular frozen quantized baseline performs poorly. |
+
+The paired LoRA/QLoRA outcomes are **2,028 both correct, 127 LoRA-only correct,
+115 QLoRA-only correct and 704 neither correct**. Thus the 12-answer net gap hides
+242 disagreements in correctness. These descriptive counts are not a
+multi-seed superiority or equivalence test.
+
+| Factor | Controlled here | Remaining attribution limit |
+|---|---|---|
+| Prompt | Same frozen system prompt and chat template across the four source arms. | No tuned prompt-only or few-shot baseline; adaptation is not shown necessary or best among all prompting strategies. |
+| Decoding | Same greedy decoder, one beam, 256-token cap, KV cache, terminal-token policy and active repetition penalty 1.1. | No constrained-decoder or output-repair ablation. Sampling settings are inactive with `do_sample=false`. |
+| Quantization | Compare each trained adapter with its matching dense/NF4 backbone; record the common precision policy. | LoRA versus QLoRA changes the training arithmetic and learned adapters together. It does not isolate quantizing one common trained adapter at inference. |
+| Data and budget | Same official splits, training order identity, seed, adapter initialization and token/update budgets. | Inspected test data, duplicate utterances and one seed limit generalization and causal claims. |
+| Native backend | Same frozen QLoRA artifacts and reconstructed prompt tokens for the eight-case regression. | CUDA→MPS also changes batch 32→1 and runtime kernels. Token agreement does not isolate those effects. |
+
+After excluding the 26 overlapping test utterances, the saved source results are:
+
+| System | Entire response correct /2,948 | Accuracy |
+|---|---:|---:|
+| Dense base | 168 | 5.70% |
+| NF4 base | 8 | 0.27% |
+| LoRA | 2,134 | 72.39% |
+| QLoRA | 2,123 | 72.01% |
+
+The similar subset result makes direct normalized-utterance overlap an incomplete
+explanation for the adaptation gain. It does not turn this reused test set into
+an untouched audit. No prompts, splits, checkpoints or decoding settings were
+changed after this analysis.
 
 ## 4. Native regression and memory failures
 
@@ -170,33 +225,99 @@ used this project's own environment and completed all 19 code cells. Its executi
 receipt refers to that earlier notebook snapshot; the two executions are kept
 separate in the public evidence.
 
-The current software gate passes **127 tests and 38 subtests**, plus Ruff lint,
-format checks and dependency consistency. The earlier notebook-refactor gate
+The pre-benchmark software gate passed **127 tests and 38 subtests**, with
+dependency consistency checked in the restored project environment. Historical
+Ruff lint/format and notebook-refactor receipts are retained. The earlier gate
 contained 126 tests; the added test checks provenance for the nested public
 notebook while excluding checkpoint copies. Tests cover integrity, scoring,
 regression gates, malformed output, deadline/cancellation behavior, model release,
 replay scope/device matching and notebook API checks. Most failure paths use
 synthetic data and fake engines; they do not imply additional model evaluations.
 
-Use the named project kernel described in the [README](../README.md) for the next
-run. The executed working notebook is preserved locally; the public copy clears
+After the comparison/export update, **133 tests and 38 subtests pass**. The six
+added checks cover exclusion of private payloads, retention of invalid outputs in
+benchmark denominators, and rejection of mismatched identity, scope, order or
+aggregates. Targeted Ruff lint/format checks also pass. The aggregate exporter
+preserves the existing public notebook and reference chart in results-only mode.
+
+The 1 November CLI benchmark independently verified execution in this project's
+own environment. It does not alter the saved notebook's kernel history. Use the
+named project kernel described in the [README](../README.md) for future notebook
+work. The executed working notebook is preserved locally; the public copy clears
 outputs and execution metadata and names the intended project kernel.
 
-## 7. Limitations and next experiment
+## 7. Bounded native validation timing
+
+One fresh QLoRA/MPS run used the first eight validation requests in frozen file
+order, with one separately timed first request, two excluded warmups and three
+measured repetitions of all eight inputs. All 27 predictions completed; the
+reported aggregates cover **24 timed requests and eight distinct inputs**.
+
+| Measurement | Result |
+|---|---:|
+| Model loading | 4.5144 s |
+| First request | 7.2373 s |
+| Warm p50 | 3.2676 s |
+| Warm p95, nearest rank | 5.4403 s |
+| Sequential request throughput | 0.2966 requests/s |
+| Generated-token throughput | 6.7104 tokens/s |
+| Measured schema-valid responses | 24/24 |
+| Timed duration / generated tokens | 80.9195 s /543 tokens |
+
+Timing includes tokenization, input transfer, generation, synchronization,
+decoding, schema validation and guard overhead. It excludes loading and
+post-request memory snapshots. Throughput divides totals by summed timed request
+durations, excluding warmups and orchestration. Generated-token counts include
+terminal tokens. The p95 is the 23rd sorted observation of 24, with limited
+information about population tails. Output lengths range from 12 to 41 tokens.
+
+Model loading excludes imports and bundle hashing; disk caches were not flushed.
+These load/first-request figures therefore do not establish storage-cold startup.
+This CLI timing is not an HTTP load test. It uses different inputs, batching and
+timing boundaries from the CUDA source experiment, so no CUDA speedup is derived.
+
+Per-request point samples show **0.668–0.746 GiB process RSS, 0.944 GiB MPS
+allocated and 2.695 GiB MPS driver memory**. Counters overlap and must not be added;
+they are not peaks. System swap matched the preflight **10.4375 MiB** at all 24
+measured samples. This is no observed growth at those points, not a continuous
+paging trace or a claim that swap was unused. The original admission, memory,
+swap and 60-second cooperative deadline guards remained enabled. The run exited
+successfully without retries.
+
+The benchmark identifies the same frozen manifest and model revision as the
+regression check. All 73 input files passed full hash verification. After the run,
+all 861 archived source-project entries and 79 protected existing reliability
+files retained their contents, sizes and modification times. Raw results remain
+local; selected timing, memory and provenance are in the public aggregate JSON.
+The later report/export changes do not rewrite the original notebooks or runs.
+
+## 8. Scope decision and remaining limits
 
 The test requests were already inspected in the source experiment. Reuse here is
 regression detection, not new generalization evidence. Eight cases do not establish
-full-test parity or reliability on new requests. No fresh local baseline matrix,
-full 2,974-request MPS comparison, validation latency benchmark or peak-memory
-measurement is recorded. The current memory counters are overlapping point
-samples and must not be summed or relabeled as peaks.
+full-test parity or reliability on new requests. The comparison analysis is
+complete for **saved four-arm CUDA quality, eight-case MPS QLoRA regression and
+eight-input/three-repeat MPS QLoRA cost**. Their denominators and purposes remain
+separate; validation schema validity is not a new task-accuracy estimate.
 
-The next measured step is a fresh **QLoRA smoke run using the project kernel**,
-followed by the fixed validation-only benchmark if memory conditions permit.
-Benchmarking separates loading, the first request, two excluded warmups and
-measured requests, with synchronized p50/p95 and throughput. Those values remain
-unreported until the benchmark runs. Revisit LoRA only after memory availability
-improves, retaining the frozen cases and guards.
+The bounded scope retains the primary portability/failure-detection result and
+adds one measured local execution cost. The following work is explicitly deferred
+for this result, rather than treated as missing evidence that can support claims:
+
+| Deferred work | Reason and resulting claim limit |
+|---|---|
+| Full 2,974-request MPS replay | The fixed eight-case check establishes bounded regression behavior; full-test native equivalence remains unproven. |
+| Native base/NF4/LoRA performance matrix | The run answers the cost of one viable local QLoRA configuration; no cross-model speed or memory-efficiency ranking. |
+| Further LoRA loading | Two memory-guard stops remain failures. Reconsider only with improved memory conditions; retain the guards. |
+| Peak-memory instrumentation and concurrent serving | Current counters are points and service checks are bounded; no peak-memory or concurrent-capacity claim. |
+| Prompt/decoder ablations and multiple training seeds | They require a separately registered experiment; no universal need for adaptation, causal quantization claim, superiority or equivalence claim. |
+
+No new model execution is required to finalize this bounded comparison. The
+[Efficient Transformers lab index](../docs/efficient-transformers.md),
+[release wrap-up](../docs/release-wrap-up.md) and
+[long-form article draft](../docs/efficient-transformers-article.md) are prepared
+locally. Author review/publication, application/profile work and the weekly
+review remain separate program gates.
 
 The practical result is a local system that can verify artifacts, reproduce a
 small set of adapted-model outputs and expose stopped runs clearly. Its strongest

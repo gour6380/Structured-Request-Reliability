@@ -75,6 +75,74 @@
     },
     "whole_record_correct_count": 4
   },
+  "native_qlora_benchmark": {
+    "distinct_validation_inputs": 8,
+    "excluded_warmup_requests": 2,
+    "first_request_seconds": 7.237254958003177,
+    "generated_tokens_per_second": 6.71036900562015,
+    "hardware": {
+      "machine": "arm64",
+      "memory_total_bytes": 17179869184,
+      "platform": "macOS-27.2-arm64-arm-64bit-Mach-O"
+    },
+    "identity": {
+      "compute_dtype": "torch.bfloat16",
+      "device": "mps",
+      "manifest_sha256": "2ad5834f5e99f3ab2f254737017a3a41cab4a47b6ffcd51d6e2add19a91ff7f4",
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "model_revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "python": "3.13.11",
+      "system": "qlora"
+    },
+    "measured_requests": 24,
+    "memory_point_sample_ranges": {
+      "mps_allocated_bytes": {
+        "maximum_bytes": 1013899008,
+        "minimum_bytes": 1013899008
+      },
+      "mps_driver_bytes": {
+        "maximum_bytes": 2893758464,
+        "minimum_bytes": 2893758464
+      },
+      "rss_bytes": {
+        "maximum_bytes": 800833536,
+        "minimum_bytes": 716816384
+      },
+      "system_swap_used_bytes": {
+        "maximum_bytes": 10944512,
+        "minimum_bytes": 10944512
+      }
+    },
+    "model_load_seconds": 4.514364333997946,
+    "p50_seconds": 3.2676193750012317,
+    "p95_seconds": 5.4403270420007175,
+    "packages": {
+      "bitsandbytes": "0.50.2",
+      "peft": "0.21.0",
+      "safetensors": "0.8.0",
+      "torch": "2.14.0",
+      "transformers": "5.17.0"
+    },
+    "preflight_system_swap_used_bytes": 10944512,
+    "qualifications": [
+      "Eight repeated inputs are not 24 independent examples or a population-tail estimate.",
+      "Schema validity is not task correctness; this run computes no accuracy score.",
+      "Memory counters overlap; point samples are not peaks or a continuous paging trace.",
+      "OS disk caches were not flushed; load and first request are not storage-cold results.",
+      "Throughput excludes load, warmups and orchestration; not concurrent serving capacity.",
+      "Generated-token counts include terminal tokens.",
+      "No native baseline, LoRA or CUDA performance comparison was measured."
+    ],
+    "repetitions": 3,
+    "requests_per_second": 0.2965908952760287,
+    "schema_invalid_count": 0,
+    "schema_valid_count": 24,
+    "scope": "First eight frozen validation inputs, sequential MPS inference, three repetitions",
+    "separate_first_requests": 1,
+    "timing_boundary": "Tokenization, transfer, generation, synchronization, decoding and schema validation; model loading and subsequent memory snapshots excluded.",
+    "total_generated_tokens": 543,
+    "total_timed_seconds": 80.91954399902897
+  },
   "notebook_audit": {
     "earlier_project_environment_verification": {
       "cell_count": 40,
@@ -206,17 +274,22 @@
   "provenance": {
     "exporter": {
       "path": "scripts/export_public_artifacts.py",
-      "sha256": "1b7aa0c3d6fc170afb1bc8e9c679a257338090f6e26070952e00e467344d2072"
+      "sha256": "9aaabbcff505465b61d14972e08ad5bd0364697fb47f2b4c510fa6c8f49a7be3"
     },
     "qualification": "Relative source paths and SHA-256 only. Raw private source artifacts are not included in the public export.",
     "sources": {
+      "data/frozen/examples/validation.jsonl": "08f452c3e9ff455bf3d31761319f48ddb4b0cc485637f31b512b72284acff7c1",
       "data/frozen/manifest.json": "2ad5834f5e99f3ab2f254737017a3a41cab4a47b6ffcd51d6e2add19a91ff7f4",
+      "data/frozen/provenance/data.json": "13d566eb9045a383ce886e553a5fbbdbd34e7e6c66e4cca668bb761084f2bfc4",
       "notebooks/structured_request_reliability.ipynb": "ea6dd21266436b6215827848bdcdad02e2ffb1c3f28b6919715557e855663bae",
+      "reports/benchmark-qlora-validation-20261101T084410Z/summary.json": "1165cb9dc2bfc0efd599da963afa41cff56c42f902efdc57ed47ba16594a53fe",
       "reports/local-api-check.json": "43da03840dbc0fe1d11436a4682a49464dc4dae9a27e1857ded1d534c72688ef",
       "reports/mps-lora-isolated/summary.json": "b30ae76df54d8fbef4add6d46ddcc9c26a76ae00fd8b2e0cf3665f6e64368bec",
       "reports/mps-reference-smoke/qlora/report.json": "175fb12d90bf99ad37670fcecddb339171832f1a24ddb2932cf4e9971144049b",
       "reports/mps-reference-smoke/summary.json": "5529f492a14d0c7ae8dcb161f94004462d3924297f26286d417a00623e370cf5",
       "reports/reference-audit.json": "69cd0d5a7f650a03dd7e34a77cf0a2c07ffbb9645c0fe72b3daf2a1a2a3d37cc",
+      "verification/bounded-benchmark-2026-11-01-preflight.json": "f002187532e07a4e9d5f20a8558fbf1e673cce62524dadf6b18b7feaa9187d02",
+      "verification/bounded-benchmark-2026-11-01-tests.xml": "ac47c2157731649e66ab8e39d79fa0ab389644eab94d58de834e249295015734",
       "verification/github-tests.xml": "5e18e90db334a726b25160ddf10c3e287a7879ebdefc76ddd8afe78a34614d3a",
       "verification/notebook-execution.json": "88565f884e14b868203ad6aa986a7751a752cc4e6b37223fe1cf34fecce3968d",
       "verification/notebook-tests.xml": "ea320703e40eca8c341c6d0dc2a94664b3edf6bb08eb11c64a02980f757a377b"
@@ -243,13 +316,90 @@
       "subtests_passed": 38,
       "test_cases_passed": 127
     },
+    "pre_benchmark_gate": {
+      "junit": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 165
+      },
+      "scope": "Saved pre-benchmark JUnit receipt; not rerun by this exporter",
+      "status": "passed",
+      "subtests_passed": 38,
+      "test_cases_passed": 127
+    },
     "ruff": "passed",
     "scope": "Recorded notebook-refactor test run; not a new test run by this exporter",
     "subtests_passed": 38,
     "test_cases_passed": 126
   },
   "source_reference": {
+    "data_overlap_audit": {
+      "all_official_rows_retained": true,
+      "duplicate_group_counts": {
+        "exact": {
+          "conflicting_group_count": 9,
+          "cross_split_group_count": 37,
+          "duplicate_group_count": 88
+        },
+        "normalized": {
+          "conflicting_group_count": 9,
+          "cross_split_group_count": 37,
+          "duplicate_group_count": 88
+        }
+      },
+      "normalization": "NFKC, casefold, collapse whitespace; audit only",
+      "novel_test_input_count": 2948,
+      "qualification": "Observed cross-split overlap; novel-input filtering does not make the inspected test set a new untouched evaluation.",
+      "test_input_overlap_count": 26
+    },
     "examples_per_system": 2974,
+    "novel_input_subset": {
+      "examples_per_system": 2948,
+      "scope": "Saved CUDA test responses whose normalized input is absent from both train and validation; still inspected source-experiment data",
+      "systems": {
+        "base": {
+          "example_count": 2948,
+          "intent_accuracy": 0.3276797829036635,
+          "intent_macro_f1": 0.34744600614881954,
+          "joint_exact_match": 0.05698778833107191,
+          "schema_valid_count": 1747,
+          "schema_valid_rate": 0.5926051560379919,
+          "slot_f1": 0.14713519127574864,
+          "whole_record_correct_count": 168
+        },
+        "lora": {
+          "example_count": 2948,
+          "intent_accuracy": 0.8992537313432836,
+          "intent_macro_f1": 0.8712503888478922,
+          "joint_exact_match": 0.7238805970149254,
+          "schema_valid_count": 2935,
+          "schema_valid_rate": 0.9955902306648575,
+          "slot_f1": 0.8128342245989305,
+          "whole_record_correct_count": 2134
+        },
+        "qlora": {
+          "example_count": 2948,
+          "intent_accuracy": 0.89280868385346,
+          "intent_macro_f1": 0.8695193940589611,
+          "joint_exact_match": 0.7201492537313433,
+          "schema_valid_count": 2938,
+          "schema_valid_rate": 0.9966078697421981,
+          "slot_f1": 0.8128779793667734,
+          "whole_record_correct_count": 2123
+        },
+        "quantized_base": {
+          "example_count": 2948,
+          "intent_accuracy": 0.017639077340569877,
+          "intent_macro_f1": 0.027049173565464168,
+          "joint_exact_match": 0.0027137042062415195,
+          "schema_valid_count": 93,
+          "schema_valid_rate": 0.03154681139755767,
+          "slot_f1": 0.0155668358714044,
+          "whole_record_correct_count": 8
+        }
+      }
+    },
     "scope": "Recomputed saved CUDA predictions; reused test data; no new inference",
     "status": "passed",
     "systems": {
